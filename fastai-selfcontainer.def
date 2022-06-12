@@ -1,0 +1,129 @@
+#  Unofficial Apptainer Image definition file for fast.ai course: https://www.fast.ai
+#
+# Note: conda and packages are being updated to latest versions for experimentation. You may want to preserve package versions for any production use. 
+# For GPU use - nvidia drivers should be installed on host system
+#
+# Usage example:
+# Build image: sudo apptainer build fastai-selfcontainer.sif fastai-selfcontainer.def && apptainer overlay create --size 16384 fastai-selfcontainer.sif
+# Start container: sudo apptainer instance start --nv --dns 8.8.8.8 --net --network bridge --network-args "portmap=7888:8888/tcp" --writable fastai-selfcontainer.sif fastai-selfcontainer-instance
+
+# We will use base Ubuntu image from Docker universe 
+Bootstrap: docker
+From: ubuntu:20.04
+
+# During the build process, commands in the %setup section are first executed on the host system outside of the container after the base OS has been installed.
+%setup
+
+# The %files section allows you to copy files into the container 
+%files
+
+# The %environment section allows you to define environment variables that will be set at runtime. 
+%environment
+    export HOME=/home/user
+    export LISTEN_PORT=8888
+    export LC_ALL=C
+    export LANG=en_US.UTF-8
+    export LANGUAGE=en_US:en
+    export PATH=/home/user/miniconda3/bin/:$PATH
+    export DEBIAN_FRONTEND=noninteractive
+    export DEBCONF_NONINTERACTIVE_SEEN=true
+
+# This section is where you can download files and install new software and libraries
+%post -c /bin/bash
+#!/bin/bash
+    CUSTOM_ENV=/.singularity.d/env/99-zz_custom_env.sh
+    cat >$CUSTOM_ENV <<EOF
+#!/bin/bash
+PS1="[container] \w \$ "
+HOME=/home/user
+source /home/user/miniconda/etc/profile.d/conda.sh
+conda activate base
+EOF
+chmod 755 $CUSTOM_ENV
+
+#!/bin/bash -x
+export HOME=/home/user
+mkdir -p $HOME 
+cd $HOME 
+
+echo "Running script under `whoami` in `pwd`"
+
+# Installing base packages
+echo "tzdata tzdata/Areas select America" >> /tmp/preseed.cfg
+echo "tzdata tzdata/Zones/America select New_York" >> /tmp/preseed.cfg
+debconf-set-selections /tmp/preseed.cfg
+rm -f /etc/timezone /etc/localtime
+apt-get update && apt-get install -y tzdata
+apt-get install -y wget neovim git htop iotop nload iputils-ping lsof curl netcat net-tools unzip
+
+# Installing and configuring conda
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh
+bash ~/miniconda.sh -b -f -p $HOME/miniconda
+rm -f miniconda.sh
+
+source /home/user/miniconda/etc/profile.d/conda.sh
+conda update -y conda
+conda activate base
+conda install -y -c anaconda nb_conda
+
+echo "Conda current environment is $CONDA_DEFAULT_ENV"
+
+# Installing fastbook dependencies
+apt install -y graphviz
+pip install fastbook
+pip install ipywidgets dtreeviz kaggle treeinterpreter waterfallcharts sympy
+git clone https://github.com/fastai/fastbook.git
+
+# Creating runscripts to configure environment for canda and run jupyter when container starts
+cat > $HOME/.runscript.sh <<EOF
+#!/bin/bash
+cd $HOME
+source /home/user/miniconda/etc/profile.d/conda.sh
+conda activate base
+echo "Now inside a container.."
+echo "Checking if GPU is avaliable...[if you don't have GPU this will fail]"
+python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'Number CUDA devices: {torch.cuda.device_count()}')" 
+echo "Writable space avaliable in this container:"
+df -hP $HOME
+EOF
+
+
+cat >$HOME/.service_script.sh <<EOF
+#!/bin/bash
+cd $HOME
+whoami
+pwd
+source /home/user/miniconda/etc/profile.d/conda.sh
+conda activate base
+# Start jupyter notebook server  without password or token. For demonstration purposes (this is generally not secure).
+jupyter notebook --allow-root --no-browser --ip='*' --NotebookApp.token='' --NotebookApp.password=''  > $HOME/.jupyter.log  2>&1 
+EOF
+
+chmod +x $HOME/.runscript.sh
+chmod +x $HOME/.service_script.sh
+
+# The contents of the %runscript section are written to a file within the container that is executed when the container image is run
+%runscript
+	exec /bin/bash --noprofile --init-file $HOME/.runscript.sh  "$@"
+
+# This file is executed when the instance start command is issued.
+%startscript
+	bash $HOME/.service_script.sh "$@" >  $HOME/.container_startup.log 2>&1
+
+# The %test section runs at the very end of the build process to validate the container
+%test
+    grep -q NAME=\"Ubuntu\" /etc/os-release
+    if [ $? -eq 0 ]; then
+        echo "Container base is Ubuntu as expected."
+    else
+        echo "Container base is not Ubuntu."
+    fi
+
+# The %labels section is used to add metadata to the container
+%labels
+    Author tensoralex 
+    Version v0.0.1
+
+%help
+	Unofficial Apptainer Image for fast.ai courses: https://www.fast.ai	
+
