@@ -1,7 +1,7 @@
 # Gentle Introduction to Apptainer
 ### by building a FAST.AI container image
 
-Apptainer is a relatively new open-source container management system for building and running secure HPC solutions. It is formerly known as the Singularity project, which began as an open-source project in 2015 aiming to bring containers to HPC clusters and the scientific computing world.
+[Apptainer](http://apptainer.org/) is a relatively new open-source container management system for building and running secure HPC solutions. It is formerly known as the Singularity project, which began as an open-source project in 2015 aiming to bring containers to HPC clusters and the scientific computing world.
 
 I will assume you have some basic familiarity with container technology, such as Docker. But if you are an experienced Docker user, most of the concepts you can quickly and easily transfer to the Apptainer world.
 
