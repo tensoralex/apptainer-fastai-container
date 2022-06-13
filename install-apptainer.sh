@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 mkdir -p ~/apptainer
 cd ~/apptainer
@@ -10,6 +11,8 @@ sudo apt-get install -y  build-essential libseccomp-dev pkg-config squashfs-tool
 export VERSION=1.18.1 OS=linux ARCH=amd64 && wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz && sudo tar -C /usr/local -xzvf go$VERSION.$OS-$ARCH.tar.gz
 
 echo 'export PATH=/usr/local/go/bin:$PATH' >> ~/.bashrc && source ~/.bashrc
+
+export PATH=/usr/local/go/bin:$PATH
 
 go version
 
